@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+.env/
+*.egg-info/
+.eggs/
+dist/
+build/
+*.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# Node / Frontend
+node_modules/
+.next/
+out/
+build/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Project Specific Data / Media
+uploads/
+outputs/
+temp/
+models/
+backend/outputs/
+backend/temp/
+backend/models/
+backend/uploads/
+
+# Database
+*.db
+*.sqlite3
+backend/video_dubbing.db
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini

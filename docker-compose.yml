@@ -1,0 +1,38 @@
+# AI Video Dubbing Pipeline - Docker Compose
+# Usage: docker-compose up --build
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./uploads:/app/uploads
+      - ./outputs:/app/outputs
+      - ./models:/app/models
+      - ./backend/Wav2Lip/checkpoints:/app/backend/Wav2Lip/checkpoints
+    environment:
+      - DUBBING_UPLOADS_DIR=/app/uploads
+      - DUBBING_OUTPUTS_DIR=/app/outputs
+    # Uncomment for GPU support:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend/video-dubbing
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
