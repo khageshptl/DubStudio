@@ -1,204 +1,80 @@
-# AI Video Dubbing Pipeline
 
-Production-ready pipeline that converts English videos to Hindi with accurate translation, voice cloning, and lip synchronization.
+# DubStudio
+
+DubStudio is an AI-powered Video Dubbing application that automates the translation and speech synthesis of English video content into Hindi. It extracts the audio, transcribes it using Whisper, translates the transcript to Hindi using Meta's NLLB model, generates synthesized Hindi speech using MMS-TTS, and effortlessly merges the audio back onto your original video.
 
 ## Features
+- **Accurate Transcription**: Powered by OpenAI's Whisper model (`large-v3`).
+- **Seamless Translation**: Translates English transcriptions to Hindi using Meta's `nllb-200-distilled-600M` model.
+- **Natural Dubbing**: Employs Meta's `mms-tts-hin` model to generate realistic spoken Hindi audio. 
+- **AI Hardware Optimization**: Dynamic scaling down to `float16` to comfortably run AI inference pipelines on lower-tier GPUs (4GB VRAM).
 
-- **Accurate translation**: IndicTrans2 (English → Hindi)
-- **Voice cloning**: XTTS for Hindi TTS with optional reference audio
-- **Lip sync**: Wav2Lip for precise lip movements
-- **Face restoration**: GFPGAN (optional) for enhanced quality
-- **Modular design**: Clean architecture, scalable for batch processing
-
-## Architecture
-
-```
-Input Video → Extract Audio → Whisper → Translate → TTS → Align → Wav2Lip → GFPGAN → Merge → Output
-```
-
-## Tech Stack
-
-| Component | Technology |
-|-----------|------------|
-| Backend | FastAPI |
-| Frontend | Next.js (React + Tailwind) |
-| Database | SQLite |
-| Queue | FastAPI BackgroundTasks |
-| Video | ffmpeg |
-| Transcription | OpenAI Whisper Large V3 |
-| Translation | IndicTrans2 |
-| TTS / Voice | XTTS, gTTS fallback |
-| Lip Sync | Wav2Lip |
-| Face Restoration | GFPGAN |
-
-## Quick Start
+## Setup Instructions
 
 ### Prerequisites
+- **Python 3.10+**
+- **Node.js** (v18+)
+- **FFmpeg**: Must be installed and accessible via your system's PATH.
 
-- Python 3.11+
-- Node.js 20+
-- ffmpeg
-- CUDA (optional, for GPU)
-- ~16GB RAM, 8GB+ VRAM recommended for GPU
-
-### 1. Backend Setup
-
+### 1. Backend Setup (FastAPI)
+Navigate to the backend directory and set up your Python virtual environment.
 ```bash
 cd backend
 python -m venv venv
-# Windows: venv\Scripts\activate
-# Linux/Mac: source venv/bin/activate
+# Activate the environment
+# Windows:
+.\venv\Scripts\activate
+# macOS/Linux:
+source venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-Download Wav2Lip checkpoint:
-
-```bash
-# Place wav2lip_gan.pth in backend/Wav2Lip/checkpoints/
-# Get from: https://github.com/Rudrabha/Wav2Lip
+Create a `.env` file in the root directory (or `backend` directory depending on your setup path) and add your Hugging Face API token if you plan to use gated models:
+```env
+HF_TOKEN=your_hugging_face_token
+DUBBING_TRANSLATION_MODEL=facebook/nllb-200-distilled-600M
 ```
 
-### 2. Frontend Setup
+Run the FastAPI backend server:
+```bash
+uvicorn app.main:app --reload --port 8000
+```
 
+### 2. Frontend Setup (Next.js)
+Open a new terminal, navigate to the frontend directory, and start the development server.
 ```bash
 cd frontend/video-dubbing
 npm install
 npm run dev
 ```
+The frontend should now be accessible at `http://localhost:3000`.
 
-### 3. Run Backend
+## Architecture & Dependencies
+- **Frontend**: Next.js, React, TailwindCSS.
+- **Backend API**: FastAPI, Uvicorn, Python 3.10+.
+- **AI / Machine Learning**: PyTorch, Transformers, Hugging Face Hub, Librosa, SciPy.
+- **Media Processing**: FFmpeg.
 
-```bash
-cd backend
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
+## Estimated Cost if Scaled (Per Minute of Video)
+If deployed in a cloud environment (e.g., AWS, GCP, RunPod, or Lambda GPU instances):
+- **Transcription (Whisper)**: ~$0.005 per minute.
+- **Translation (NLLB)**: ~$0.001 per minute.
+- **Text-to-Speech (MMS)**: ~$0.01 per minute.
+- **Compute (e.g., Nvidia T4 / A10G Instance)**: ~$0.02 - $0.05 per minute of processing time.
+- **Total Estimated Cost**: Roughly **$0.03 - $0.07 per minute** of video depending on the target GPU architecture and cloud provider scaling policies.
 
-### 4. Open UI
+## Known Limitations
+- **Processing Time**: Rendering on CPUs is significantly slower than on dedicated GPUs with CUDA enabled.
+- **Hardware Bottlenecks**: Loading multiple Transformer models into memory sequentially requires strict memory management (implemented as `float16` precision) for GPUs with low VRAM (e.g., 4GB).
+- **Lip-Sync**: Direct lip-sync orchestration (`Wav2Lip`) is incredibly resource intensive and prone to timeouts on non-CUDA machines. It is currently bypassed in the pipeline to dramatically improve processing time.
+- **Translation Fallbacks**: Highly localized slang or heavily accented English might lead to slight misinterpretations during the transcription phase, cascading into translation inaccuracies.
 
-Navigate to `http://localhost:3000`.
-
----
-
-## Docker
-
-```bash
-# Build and run (requires NVIDIA Docker for GPU)
-docker-compose up --build
-
-# Backend: http://localhost:8000
-# Frontend: http://localhost:3000
-```
-
----
-
-## API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/upload-video` | Upload video + optional timestamps, start processing |
-| POST | `/api/v1/process-video` | Restart processing for a job |
-| GET | `/api/v1/status/{job_id}` | Get job status and progress |
-| GET | `/api/v1/download/{job_id}` | Download dubbed video |
-
-### Upload Example
-
-```bash
-curl -X POST http://localhost:8000/api/v1/upload-video \
-  -F "file=@video.mp4" \
-  -F "start_time=15" \
-  -F "end_time=30"
-```
-
----
-
-## Pipeline Steps
-
-1. **Validate** – Check format, codec, duration, audio presence  
-2. **Extract audio** – ffmpeg, 16kHz mono WAV  
-3. **Segment video** – Extract 00:15–00:30 (or specified range)  
-4. **Transcribe** – Whisper Large V3  
-5. **Clean transcript** – Merge short segments, filter silence  
-6. **Translate** – IndicTrans2 (English → Hindi)  
-7. **Generate speech** – XTTS (Hindi TTS, optional voice clone)  
-8. **Align audio** – Stretch/compress to match segment length  
-9. **Lip sync** – Wav2Lip  
-10. **Face restore** – GFPGAN (optional)  
-11. **Merge** – Combine video + audio → final MP4  
-
----
-
-## Scaling to 500+ Hours
-
-For overnight batch processing:
-
-1. **Job queue**: Replace BackgroundTasks with Celery + Redis (or similar)
-2. **Workers**: Run multiple workers, each on a GPU
-3. **Parallel GPU inference**: Batch transcriptions, translations, TTS
-4. **Chunking**: Split long videos into ~30s segments, process in parallel
-5. **Memory control**: Unload models between jobs, limit concurrent jobs per GPU
-
-### Example Celery Setup
-
-```python
-# Replace BackgroundTasks with Celery
-@celery_app.task
-def run_dubbing_pipeline(job_id: str):
-    ...
-```
-
----
-
-## Cost Estimation (per minute of video)
-
-| Component | GPU (A100) | CPU |
-|-----------|------------|-----|
-| Whisper | ~0.02 min | ~2 min |
-| IndicTrans2 | ~0.01 min | ~0.5 min |
-| XTTS | ~0.05 min | ~3 min |
-| Wav2Lip | ~0.1 min | ~5 min |
-| GFPGAN | ~0.05 min | ~2 min |
-| **Total** | **~0.25 min** | **~12 min** |
-
-Rough cloud cost: ~$0.10–0.30 per minute on GPU.
-
----
-
-## Edge Cases Handled
-
-- Silent segments → Skipped or short TTS
-- Multiple speakers → Single-voice output (extend for multi-speaker)
-- Background noise → Whisper robust to moderate noise
-- FPS mismatch → Preserved via ffmpeg
-- Audio/video duration mismatch → Alignment step
-- GPU unavailable → Fallback to CPU
-- Model init delays → Lazy loading, caching
-
----
-
-## Folder Structure
-
-```
-backend/
-  app/
-    api/          # FastAPI routes
-    config/       # Settings
-    models/       # SQLAlchemy models
-    pipeline/     # DubbingPipeline
-    services/     # audio, transcription, translation, etc.
-    utils/        # logging, validation
-  Wav2Lip/        # Lip sync model
-
-frontend/
-  video-dubbing/  # Next.js app
-
-models/           # Cached AI models
-outputs/          # Final dubbed videos
-uploads/          # Uploaded videos
-scripts/          # Helper scripts
-```
-
----
-
-## License
-
-MIT
+## Future Improvements
+If given more time, the following enhancements would be prioritized:
+1. **Cloud Offloading (Serverless GPUs)**: Offload the heaviest AI inference tasks (Transcription, TTS) to serverless GPU endpoints (like Replicate or Modal) to decouple hardware requirements from the host machine.
+2. **Re-integrate Lip Syncing**: Fix dependencies and performance ceilings to cleanly reintegrate `Wav2Lip` or experiment with newer, faster models like `SadTalker` for realistic facial alignment with the dubbed audio.
+3. **Voice Cloning Integration**: Substitute standard TTS with Zero-Shot Voice Cloning (e.g., `XTTSv2` or `ElevenLabs API`) so the generated Hindi payload accurately mimics the original speaker's vocal tone and cadence.
+4. **Interactive Subtitles**: Generate and overlay burned-in Hindi subtitles onto the final video using the aligned timestamps.
+5. **Streaming/Chunked Processing**: Instead of waiting for the entire video to process before finalizing, pipeline the chunks so audio is dynamically stitched on the fly.
